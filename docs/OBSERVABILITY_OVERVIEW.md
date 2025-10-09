@@ -202,6 +202,32 @@ oc logs -n observability-hub deployment/tempo-tempostack-gateway --tail=20
    - Configure Tempo as data source
    - Use trace ID or service name to search traces
 
+## Updating Shared Observability Infrastructure
+
+The observability infrastructure (OpenTelemetry collector, Tempo, MinIO) is deployed 
+to the `observability-hub` namespace and shared by all application namespaces 
+(main, dev, etc.).
+
+### Important Notes:
+- Deploying to application namespaces (main, dev) does NOT update observability-hub
+- The Makefile skips reinstalling observability components if already present
+- Manual patches to CRs will be overwritten by Helm operations
+- Always update via Helm to ensure changes persist
+
+### To Update Observability Components:
+1. Make changes to Helm charts in `deploy/helm/observability/`
+2. Run: `helm upgrade <component> ./deploy/helm/observability/<component> --namespace observability-hub`
+3. Verify the update was successful
+
+### Force Updating Observability Infrastructure:
+```bash
+# Force upgrade all observability components
+make upgrade-observability
+
+# Check for configuration drift
+make check-observability-drift
+```
+
 ## Troubleshooting
 
 ### Common Issues

@@ -174,6 +174,8 @@ help:
 	@echo "Individual Components:"
 	@echo "  install-observability - Install TempoStack and OTEL Collector only"
 	@echo "  uninstall-observability - Uninstall TempoStack and OTEL Collector only"
+	@echo "  upgrade-observability - Force upgrade observability components (even if already installed)"
+	@echo "  check-observability-drift - Check for configuration drift in observability-hub"
 	@echo "  setup-tracing - Enable auto-instrumentation for tracing in target namespace (idempotent)"
 	@echo "  remove-tracing - Disable auto-instrumentation for tracing in target namespace"
 	@echo "  install-minio - Install MinIO observability storage backend only"
@@ -711,6 +713,30 @@ uninstall-observability:
 
 .PHONY: uninstall-observability-stack
 uninstall-observability-stack: remove-tracing uninstall-observability uninstall-minio
+
+.PHONY: upgrade-observability
+upgrade-observability:
+	@echo "→ Force upgrading OpenTelemetry Collector and Tempo in namespace $(OBSERVABILITY_NAMESPACE)"
+	@echo "  This will update the configuration even if already installed"
+	cd deploy/helm && helm upgrade --install tempo ./observability/tempo \
+		--namespace $(OBSERVABILITY_NAMESPACE) \
+		--create-namespace \
+		--set global.namespace=$(OBSERVABILITY_NAMESPACE) \
+		$(helm_tempo_args)
+	cd deploy/helm && helm upgrade --install otel-collector ./observability/otel-collector \
+		--namespace $(OBSERVABILITY_NAMESPACE) \
+		--create-namespace \
+		--set global.namespace=$(OBSERVABILITY_NAMESPACE)
+	@echo "✅ Observability components upgraded successfully"
+
+.PHONY: check-observability-drift
+check-observability-drift:
+	@echo "→ Checking for configuration drift in observability-hub namespace"
+	@echo "  Helm Chart Version:"
+	@helm list -n $(OBSERVABILITY_NAMESPACE) | grep -E "otel-collector|tempo" || echo "  Not found"
+	@echo ""
+	@echo "  To upgrade observability components, run:"
+	@echo "    make upgrade-observability"
 
 
 .PHONY: install-minio
