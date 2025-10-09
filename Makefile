@@ -3,7 +3,7 @@
 
 # NAMESPACE validation for deployment targets
 ifeq ($(NAMESPACE),)
-ifeq (,$(filter install-local depend install-ingestion-pipeline list-models% generate-model-config help build build-ui build-alerting build-mcp-server push push-ui push-alerting push-mcp-server install-observability-stack uninstall-observability-stack clean config test,$(MAKECMDGOALS)))
+ifeq (,$(filter install-local depend install-ingestion-pipeline list-models% generate-model-config help build build-ui build-alerting build-mcp-server push push-ui push-alerting push-mcp-server uninstall-observability-stack clean config test check-observability-drift,$(MAKECMDGOALS)))
 $(error NAMESPACE is not set)
 endif
 endif
@@ -168,7 +168,7 @@ help:
 	@echo "  install-ingestion-pipeline - Install extra ingestion pipelines"
 	@echo ""
 	@echo "Observability Stack:"
-	@echo "  install-observability-stack - Install complete observability stack (MinIO + TempoStack + OTEL + tracing)"
+	@echo "  install-observability-stack - Install complete observability stack (MinIO + TempoStack + OTEL + tracing + drift check)"
 	@echo "  uninstall-observability-stack - Uninstall complete observability stack (tracing + TempoStack + OTEL + MinIO)"
 	@echo ""
 	@echo "Individual Components:"
@@ -683,7 +683,7 @@ install-observability:
 	fi
 
 .PHONY: install-observability-stack
-install-observability-stack: install-minio setup-tracing install-observability
+install-observability-stack: install-minio setup-tracing install-observability check-observability-drift
 
 .PHONY: setup-tracing
 setup-tracing: namespace
@@ -731,12 +731,7 @@ upgrade-observability:
 
 .PHONY: check-observability-drift
 check-observability-drift:
-	@echo "→ Checking for configuration drift in observability-hub namespace"
-	@echo "  Helm Chart Version:"
-	@helm list -n $(OBSERVABILITY_NAMESPACE) | grep -E "otel-collector|tempo" || echo "  Not found"
-	@echo ""
-	@echo "  To upgrade observability components, run:"
-	@echo "    make upgrade-observability"
+	@scripts/check-observability-drift.sh $(OBSERVABILITY_NAMESPACE)
 
 
 .PHONY: install-minio

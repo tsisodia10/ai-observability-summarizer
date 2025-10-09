@@ -228,6 +228,35 @@ make upgrade-observability
 make check-observability-drift
 ```
 
+### Configuration Drift Detection
+
+The `check-observability-drift` target provides detailed analysis of observability components:
+
+- **OpenTelemetry Collector**: Checks for deprecated configuration fields that cause crashes with operator 0.135.0+
+- **TempoStack**: Verifies installation and revision status
+- **OpenTelemetry Operator**: Validates compatibility and configuration format
+
+Example output:
+```
+→ Checking for configuration drift in observability-hub namespace
+
+  🔍 Checking OpenTelemetry Collector...
+  📊 OpenTelemetry Collector: Revision observability-hub
+  ✅ OpenTelemetry Collector: Configuration is up-to-date
+
+  🔍 Checking TempoStack...
+  📊 TempoStack: Revision observability-hub
+  ✅ TempoStack: Configuration is up-to-date
+
+  🔍 Checking OpenTelemetry operator compatibility...
+  📊 OpenTelemetry Operator: 0.135.0-1
+  ✅ OpenTelemetry Operator: Configuration is compatible
+     → No deprecated 'address' field found in telemetry config
+
+✅ No configuration drift detected
+💡 All observability components are up-to-date
+```
+
 ## Troubleshooting
 
 ### Common Issues
@@ -280,6 +309,13 @@ oc logs -n observability-hub deployment/tempo-tempostack-gateway --tail=20
 - `make uninstall-observability` - Uninstall TempoStack + OTEL only
 - `make setup-tracing NAMESPACE=ns` - Enable auto-instrumentation
 - `make remove-tracing NAMESPACE=ns` - Disable auto-instrumentation
+
+### Observability Infrastructure Management
+- `make upgrade-observability` - Force upgrade observability components (bypasses "already installed" checks)
+- `make check-observability-drift` - Check for configuration drift and compatibility issues
+
+### Shell Scripts
+- `scripts/check-observability-drift.sh` - Standalone script for drift detection (can be run independently)
 
 ## Benefits
 
