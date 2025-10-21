@@ -7,6 +7,10 @@ building prompts, and processing LLM responses.
 
 import re
 import requests
+import pandas as pd
+import numpy as np
+import json
+import os
 from typing import Dict, List, Optional, Any
 from .config import CHAT_SCOPE_FLEET_WIDE
 from datetime import datetime, timedelta, timezone, time
@@ -81,6 +85,309 @@ def _clean_llm_summary_string(text: str) -> str:
     cleaned_text = re.sub(r"[^\x20-\x7E\n\t]", "", text)
     # Replace multiple spaces/newlines/tabs with single spaces, then strip leading/trailing whitespace
     return re.sub(r"\s+", " ", cleaned_text).strip()
+
+
+def _load_mlops_metrics_config() -> Dict[str, Any]:
+    """Load MLOps metrics configuration from JSON file"""
+    try:
+        config_path = os.path.join(os.path.dirname(__file__), "mlops_metrics_config.json")
+        with open(config_path, 'r') as f:
+            return json.load(f)
+    except Exception:
+        # Fallback to basic metrics if config file not found
+        return {
+            "mlops_critical_metrics": {
+                "user_experience": {
+                    "metrics": {
+                        "P95 Latency (s)": {"priority": 1},
+                        "Requests Running": {"priority": 1}
+                    }
+                }
+            }
+        }
+
+
+def _get_priority_metrics(metric_dfs: Dict[str, Any], max_metrics: int = 8) -> Dict[str, Any]:
+    """Filter to only the most important metrics for MLOps analysis"""
+    
+    config = _load_mlops_metrics_config()
+    
+    # Create priority mapping from config
+    priority_metrics = {}
+    
+    for category, category_data in config["mlops_critical_metrics"].items():
+        category_priority = category_data.get("priority", 5)
+        for metric_name, metric_config in category_data["metrics"].items():
+            if metric_name in metric_dfs:
+                priority_metrics[metric_name] = {
+                    "priority": category_priority,
+                    "config": metric_config,
+                    "df": metric_dfs[metric_name]
+                }
+    
+    # Sort by priority and return top metrics
+    sorted_metrics = sorted(priority_metrics.items(), key=lambda x: x[1]["priority"])
+    
+    result = {}
+    for metric_name, metric_info in sorted_metrics[:max_metrics]:
+        result[metric_name] = metric_info["df"]
+    
+    return result
+
+
+def _add_simple_intelligence(metric_name: str, df) -> str:
+    """Add statistical intelligence with contextual assessment - Phase 2.1 enhancement"""
+    
+    if df is None or df.empty or len(df) < 3:
+        return ""
+    
+    try:
+        values = df['value'].values
+        current_value = values[-1]
+        insights = []
+        
+        # Load thresholds from configuration
+        config = _load_mlops_metrics_config()
+        metric_config = None
+        
+        # Find metric configuration across all categories
+        for category_data in config["mlops_critical_metrics"].values():
+            if metric_name in category_data["metrics"]:
+                metric_config = category_data["metrics"][metric_name]
+                break
+        
+        # Phase 1: Volatility analysis using coefficient of variation
+        if len(values) > 1 and np.mean(values) > 0:
+            cv = (np.std(values) / np.mean(values)) * 100
+            if cv > 20:
+                insights.append(f"🌪️ High volatility ({cv:.1f}%)")
+            elif cv > 10:
+                insights.append(f"📊 Moderate volatility ({cv:.1f}%)")
+            else:
+                insights.append(f"🎯 Stable ({cv:.1f}%)")
+        
+        # Phase 2.1: Data-driven contextual assessment using percentiles
+        if len(values) >= 5:
+            p25 = np.percentile(values, 25)
+            p75 = np.percentile(values, 75)
+            p95 = np.percentile(values, 95)
+            
+            # Contextual assessment based on data distribution
+            if current_value >= p95:
+                insights.append("🚨 Outlier High (top 5%)")
+            elif current_value >= p75:
+                insights.append("⚠️ Above Average (upper quartile)")
+            elif current_value >= p25:
+                insights.append("✅ Normal Range")
+            else:
+                insights.append("📉 Below Average (lower quartile)")
+        
+        # Phase 1: Trend detection using linear regression
+        if len(values) >= 5:
+            slope = np.polyfit(np.arange(len(values)), values, 1)[0]
+            if abs(slope) > 0.01:
+                if slope > 0:
+                    insights.append("📈 Increasing trend")
+                else:
+                    insights.append("📉 Decreasing trend")
+            else:
+                insights.append("➡️ Stable trend")
+        
+        return " | ".join(insights) if insights else ""
+        
+    except Exception:
+        return ""
+
+
+def _detect_simple_correlations(metric_dfs: Dict[str, Any]) -> List[str]:
+    """Detect simple correlations between key metrics - Phase 2.2 enhancement"""
+    
+    correlations = []
+    
+    try:
+        # Get key metrics for correlation analysis
+        gpu_temp = metric_dfs.get("GPU Temperature (°C)")
+        gpu_usage = metric_dfs.get("GPU Usage (%)")
+        p95_latency = metric_dfs.get("P95 Latency (s)")
+        requests_running = metric_dfs.get("Requests Running")
+        inference_time = metric_dfs.get("Inference Time (s)")
+        
+        # Correlation 1: GPU Temperature vs GPU Usage
+        if (gpu_temp is not None and not gpu_temp.empty and 
+            gpu_usage is not None and not gpu_usage.empty and
+            len(gpu_temp) > 3 and len(gpu_usage) > 3):
+            
+            temp_latest = gpu_temp['value'].iloc[-1]
+            usage_latest = gpu_usage['value'].iloc[-1]
+            
+            # Simple correlation logic
+            if temp_latest > 70 and usage_latest > 80:
+                correlations.append(f"🔥 High GPU temperature ({temp_latest:.1f}°C) correlates with high utilization ({usage_latest:.1f}%)")
+            elif temp_latest > 60 and usage_latest < 20:
+                correlations.append(f"🌡️ GPU temperature elevated ({temp_latest:.1f}°C) despite low utilization ({usage_latest:.1f}%) - check cooling")
+        
+        # Correlation 2: Latency vs Request Queue
+        if (p95_latency is not None and not p95_latency.empty and 
+            requests_running is not None and not requests_running.empty and
+            len(p95_latency) > 3 and len(requests_running) > 3):
+            
+            latency_latest = p95_latency['value'].iloc[-1]
+            queue_latest = requests_running['value'].iloc[-1]
+            
+            if latency_latest > 3.0 and queue_latest > 10:
+                correlations.append(f"⏱️ High latency ({latency_latest:.2f}s) correlates with request queue ({queue_latest:.0f} requests)")
+            elif latency_latest > 5.0 and queue_latest < 5:
+                correlations.append(f"🐌 High latency ({latency_latest:.2f}s) despite low queue ({queue_latest:.0f}) - model performance issue")
+        
+        # Correlation 3: Inference Time vs Latency Consistency
+        if (inference_time is not None and not inference_time.empty and 
+            p95_latency is not None and not p95_latency.empty and
+            len(inference_time) > 3 and len(p95_latency) > 3):
+            
+            inference_latest = inference_time['value'].iloc[-1]
+            latency_latest = p95_latency['value'].iloc[-1]
+            
+            # If P95 latency is much higher than inference time, indicates queuing
+            if inference_latest > 0 and latency_latest > (inference_latest * 2):
+                correlations.append(f"⏳ P95 latency ({latency_latest:.2f}s) exceeds inference time ({inference_latest:.2f}s) - queuing delays detected")
+        
+        return correlations
+        
+    except Exception:
+        return []
+
+
+def _calculate_performance_score(metric_dfs: Dict[str, Any]) -> str:
+    """Calculate weighted performance score using ML algorithm - Phase 3.1"""
+    
+    try:
+        # Define MLOps-focused metric weights (sum = 1.0)
+        metric_weights = {
+            "P95 Latency (s)": 0.35,        # Highest - user experience
+            "Inference Time (s)": 0.25,     # Model performance
+            "GPU Temperature (°C)": 0.15,   # Hardware health
+            "GPU Usage (%)": 0.15,          # Resource efficiency
+            "Requests Running": 0.10         # System load
+        }
+        
+        total_score = 0
+        total_weight = 0
+        component_scores = {}
+        
+        for metric_name, weight in metric_weights.items():
+            if metric_name in metric_dfs:
+                df = metric_dfs[metric_name]
+                if df is not None and not df.empty:
+                    values = df['value'].values
+                    current_value = values[-1]
+                    
+                    # Calculate metric score using percentile-based scoring
+                    if len(values) >= 5:
+                        p25 = np.percentile(values, 25)
+                        p75 = np.percentile(values, 75)
+                        p95 = np.percentile(values, 95)
+                        
+                        # Score based on performance (lower is better for latency/time metrics)
+                        if metric_name in ["P95 Latency (s)", "Inference Time (s)"]:
+                            if current_value <= p25:
+                                score = 100  # Best performance (low latency)
+                            elif current_value <= p75:
+                                score = 70   # Good performance
+                            elif current_value <= p95:
+                                score = 40   # Poor performance
+                            else:
+                                score = 20   # Critical performance
+                        else:
+                            # For other metrics, higher can be better (GPU usage, etc.)
+                            if current_value >= p75:
+                                score = 80   # Good utilization
+                            elif current_value >= p25:
+                                score = 60   # Moderate
+                            else:
+                                score = 40   # Low utilization
+                        
+                        component_scores[metric_name] = score
+                        total_score += score * weight
+                        total_weight += weight
+        
+        if total_weight == 0:
+            return ""
+        
+        # Calculate final weighted score
+        final_score = int(total_score / total_weight)
+        
+        # Determine status
+        if final_score >= 80:
+            status = "🟢 EXCELLENT"
+        elif final_score >= 60:
+            status = "✅ GOOD"
+        elif final_score >= 40:
+            status = "⚠️ WARNING"
+        else:
+            status = "🚨 CRITICAL"
+        
+        # Find bottleneck (lowest scoring component)
+        bottleneck = min(component_scores.items(), key=lambda x: x[1]) if component_scores else None
+        
+        result = f"📊 PERFORMANCE SCORE: {final_score}/100 ({status})"
+        if bottleneck:
+            result += f" | Bottleneck: {bottleneck[0]} ({bottleneck[1]}/100)"
+        
+        return result
+        
+    except Exception:
+        return ""
+
+
+def _predict_threshold_crossings(metric_dfs: Dict[str, Any]) -> List[str]:
+    """Predict when metrics will cross critical thresholds - Phase 3.2 ML algorithm"""
+    
+    predictions = []
+    
+    # Define critical thresholds for key metrics
+    thresholds = {
+        "P95 Latency (s)": 10.0,      # 10s is critical for user experience
+        "Inference Time (s)": 5.0,    # 5s is too slow for real-time
+        "GPU Temperature (°C)": 85.0, # 85°C thermal throttling risk
+        "Requests Running": 100.0      # 100 requests = queue saturation
+    }
+    
+    try:
+        for metric_name, threshold in thresholds.items():
+            if metric_name in metric_dfs:
+                df = metric_dfs[metric_name]
+                if df is not None and not df.empty and len(df) >= 5:
+                    values = df['value'].values
+                    current_value = values[-1]
+                    
+                    # Use linear regression to predict future values
+                    x = np.arange(len(values))
+                    slope, intercept = np.polyfit(x, values, 1)
+                    
+                    # Calculate R-squared for prediction confidence
+                    y_pred = slope * x + intercept
+                    ss_res = np.sum((values - y_pred) ** 2)
+                    ss_tot = np.sum((values - np.mean(values)) ** 2)
+                    r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
+                    
+                    # Only predict if trend is statistically significant
+                    if abs(slope) > 0.01 and r_squared > 0.5 and slope > 0:
+                        # Calculate time to reach threshold (assuming 5-minute intervals)
+                        if current_value < threshold:
+                            intervals_to_threshold = (threshold - current_value) / slope
+                            minutes_to_threshold = intervals_to_threshold * 5
+                            
+                            if 0 < minutes_to_threshold <= 120:  # Within 2 hours
+                                confidence = "High" if r_squared > 0.8 else "Moderate"
+                                predictions.append(f"🚨 PREDICTION: {metric_name} will reach {threshold} in ~{int(minutes_to_threshold)} minutes ({confidence.lower()} confidence, R²={r_squared:.3f})")
+                            elif minutes_to_threshold <= 360:  # Within 6 hours
+                                hours = minutes_to_threshold / 60
+                                predictions.append(f"⚠️ FORECAST: {metric_name} trending toward {threshold} in ~{hours:.1f} hours (R²={r_squared:.3f})")
+        
+        return predictions
+        
+    except Exception:
+        return []
 
 
 def summarize_with_llm(
@@ -276,27 +583,79 @@ Current Analysis Time: {current_time}
 METRICS DATA:
 """
     
-    for metric_name, df in metric_dfs.items():
+    # Filter to only MLOps-critical metrics using configuration
+    priority_metrics = _get_priority_metrics(metric_dfs, max_metrics=8)
+    
+    for metric_name, df in priority_metrics.items():
         if df is not None and not df.empty:
             prompt += f"\n=== {metric_name.upper()} ===\n"
             # Add DataFrame summary
             prompt += f"Data points: {len(df)}\n"
             if 'value' in df.columns:
-                prompt += f"Latest value: {df['value'].iloc[-1] if len(df) > 0 else 'N/A'}\n"
+                latest_value = df['value'].iloc[-1] if len(df) > 0 else 0
+                
+                prompt += f"Latest value: {latest_value}\n"
                 prompt += f"Average: {df['value'].mean():.2f}\n"
                 prompt += f"Min: {df['value'].min():.2f}, Max: {df['value'].max():.2f}\n"
+                
+                # Add Phase 1 simple intelligence
+                intelligence = _add_simple_intelligence(metric_name, df)
+                if intelligence:
+                    prompt += f"Intelligence: {intelligence}\n"
+    
+    # Add Phase 2.2: Simple correlation detection
+    correlations = _detect_simple_correlations(metric_dfs)
+    if correlations:
+        prompt += f"\nCORRELATION INSIGHTS:\n"
+        for correlation in correlations:
+            prompt += f"- {correlation}\n"
+    
+    # Add Phase 3.1: Performance scoring algorithm
+    performance_score = _calculate_performance_score(metric_dfs)
+    if performance_score:
+        prompt += f"\nPERFORMANCE ANALYSIS:\n- {performance_score}\n"
+    
+    # Add Phase 3.2: Predictive threshold analysis
+    predictions = _predict_threshold_crossings(metric_dfs)
+    if predictions:
+        prompt += f"\nPREDICTIVE ANALYSIS:\n"
+        for prediction in predictions:
+            prompt += f"- {prediction}\n"
     
     prompt += """
 
 ANALYSIS REQUIREMENTS:
-1. **Performance Summary**: Overall health and performance status
-2. **Key Metrics Analysis**: Interpret the most important metrics
-3. **Trends and Patterns**: Identify any concerning trends
-4. **Recommendations**: Actionable suggestions for optimization
-5. **Attentions**: Summarize top 3 issues that are happening and need attention
+1. **Performance Summary**: Overall performance score and status,Primary bottleneck identification, Brief health assessment
+
+2. **Key Metrics Analysis**: 
+   - List 4-5 most critical metrics with current values
+   - Include volatility percentages for each metric
+   - Note trend direction (increasing/decreasing/stable)
+   - Identify outliers and position status (upper quartile, outlier high, etc.)
+
+3. **Critical Findings**:
+   - Most serious statistical findings with specific values
+   - Correlation insights (if metrics are related)
+   - Outlier detection results
+   - Prediction warnings (if threshold crossings expected)
+
+4. **Trends and Patterns**:
+   - Statistical trend analysis with R-squared confidence where available
+   - Pattern recognition across multiple metrics
+   - Volatility assessment and stability analysis
+
+5. **Recommendations**:
+   - Specific actionable steps based on statistical analysis
+   - Target thresholds and optimization goals
+   - Priority-based action items
+
+6. **Attentions**:
+   - Top 3 issues requiring immediate focus
+   - Include specific statistical values (volatility %, scores, predictions)
+   - Risk assessment with quantified metrics
 
 In your response, do not add or ask additional questions. 
-Answer each requirement above concisely as a summary in less than 150 words. 
+Answer each requirement above concisely as a summary in less than 250 words. 
 Stop after you have answered requirement 5 and do not add explainations or notes.
 Please provide a clear, structured analysis that would be useful for both technical teams and stakeholders.
 """

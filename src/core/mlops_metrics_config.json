@@ -1,0 +1,200 @@
+{
+  "mlops_critical_metrics": {
+    "user_experience": {
+      "priority": 1,
+      "description": "Metrics directly impacting user experience",
+      "metrics": {
+        "P95 Latency (s)": {
+          "prometheus_metric": "vllm:e2e_request_latency_seconds_bucket",
+          "query_type": "histogram_quantile",
+          "critical_threshold": 10.0,
+          "warning_threshold": 5.0,
+          "unit": "seconds",
+          "description": "95th percentile end-to-end request latency"
+        },
+        "Requests Running": {
+          "prometheus_metric": "vllm:num_requests_running",
+          "query_type": "gauge",
+          "critical_threshold": 100,
+          "warning_threshold": 50,
+          "unit": "requests",
+          "description": "Number of currently active requests"
+        },
+        "Request Queue Time (s)": {
+          "prometheus_metric": "vllm:request_queue_time_seconds_sum",
+          "query_type": "counter",
+          "critical_threshold": 30.0,
+          "warning_threshold": 10.0,
+          "unit": "seconds",
+          "description": "Total time requests spend in queue"
+        },
+        "Request Success Rate": {
+          "prometheus_metric": "vllm:request_success_total",
+          "query_type": "counter",
+          "critical_threshold": 0.95,
+          "warning_threshold": 0.98,
+          "unit": "ratio",
+          "description": "Percentage of successful requests"
+        }
+      }
+    },
+    "model_performance": {
+      "priority": 2,
+      "description": "Metrics indicating model inference performance",
+      "metrics": {
+        "Time To First Token (s)": {
+          "prometheus_metric": "vllm:time_to_first_token_seconds_sum",
+          "query_type": "counter",
+          "critical_threshold": 5.0,
+          "warning_threshold": 2.0,
+          "unit": "seconds",
+          "description": "Time from request to first token generation"
+        },
+        "Time Per Output Token (s)": {
+          "prometheus_metric": "vllm:time_per_output_token_seconds_sum",
+          "query_type": "counter",
+          "critical_threshold": 1.0,
+          "warning_threshold": 0.5,
+          "unit": "seconds",
+          "description": "Average time to generate each output token"
+        },
+        "Prompt Tokens Created": {
+          "prometheus_metric": "vllm:request_prompt_tokens_sum",
+          "query_type": "counter",
+          "critical_threshold": 1000000,
+          "warning_threshold": 500000,
+          "unit": "tokens",
+          "description": "Total input tokens processed"
+        },
+        "Output Tokens Created": {
+          "prometheus_metric": "vllm:generation_tokens_total",
+          "query_type": "counter",
+          "critical_threshold": 1000000,
+          "warning_threshold": 500000,
+          "unit": "tokens",
+          "description": "Total output tokens generated"
+        },
+        "Request Decode Time (s)": {
+          "prometheus_metric": "vllm:request_decode_time_seconds_sum",
+          "query_type": "counter",
+          "critical_threshold": 10.0,
+          "warning_threshold": 5.0,
+          "unit": "seconds",
+          "description": "Time spent decoding/processing requests"
+        },
+        "Request Prefill Time (s)": {
+          "prometheus_metric": "vllm:request_prefill_time_seconds_sum",
+          "query_type": "counter",
+          "critical_threshold": 8.0,
+          "warning_threshold": 4.0,
+          "unit": "seconds",
+          "description": "Time spent in prefill phase"
+        },
+        "Request Preemptions": {
+          "prometheus_metric": "vllm:num_preemptions_total",
+          "query_type": "counter",
+          "critical_threshold": 100,
+          "warning_threshold": 50,
+          "unit": "count",
+          "description": "Number of preempted requests due to resource constraints"
+        },
+        "Token Processing Rate": {
+          "prometheus_metric": "vllm:iteration_tokens_total",
+          "query_type": "counter",
+          "critical_threshold": 10000,
+          "warning_threshold": 5000,
+          "unit": "tokens/sec",
+          "description": "Tokens processed per second for throughput measurement"
+        }
+      }
+    },
+    "hardware_health": {
+      "priority": 3,
+      "description": "GPU and hardware monitoring metrics",
+      "metrics": {
+        "GPU Temperature (°C)": {
+          "prometheus_metric": "DCGM_FI_DEV_GPU_TEMP",
+          "query_type": "gauge",
+          "critical_threshold": 85.0,
+          "warning_threshold": 80.0,
+          "unit": "celsius",
+          "description": "GPU core temperature"
+        },
+        "GPU Power Usage (W)": {
+          "prometheus_metric": "DCGM_FI_DEV_POWER_USAGE",
+          "query_type": "gauge",
+          "critical_threshold": 400.0,
+          "warning_threshold": 300.0,
+          "unit": "watts",
+          "description": "GPU power consumption"
+        },
+        "GPU Utilization (%)": {
+          "prometheus_metric": "DCGM_FI_DEV_GPU_UTIL",
+          "query_type": "gauge",
+          "critical_threshold": 98.0,
+          "warning_threshold": 95.0,
+          "optimal_min": 70.0,
+          "unit": "percentage",
+          "description": "GPU compute utilization"
+        },
+        "GPU Cache Usage (%)": {
+          "prometheus_metric": "vllm:gpu_cache_usage_perc",
+          "query_type": "gauge",
+          "critical_threshold": 95.0,
+          "warning_threshold": 85.0,
+          "unit": "percentage",
+          "description": "GPU memory cache utilization"
+        }
+      }
+    },
+    "resource_efficiency": {
+      "priority": 4,
+      "description": "Resource utilization and efficiency metrics",
+      "metrics": {
+        "Cache Hit Ratio": {
+          "prometheus_metric": "vllm:gpu_prefix_cache_hits_total",
+          "query_type": "ratio",
+          "calculation": "hits_total / queries_total",
+          "critical_threshold": 0.3,
+          "warning_threshold": 0.5,
+          "optimal_min": 0.8,
+          "unit": "ratio",
+          "description": "Prefix cache hit ratio for efficiency"
+        },
+        "KV Cache Usage (%)": {
+          "prometheus_metric": "vllm:kv_cache_usage_perc",
+          "query_type": "gauge",
+          "critical_threshold": 95.0,
+          "warning_threshold": 85.0,
+          "optimal_max": 90.0,
+          "unit": "percentage",
+          "description": "Key-value cache memory utilization"
+        },
+        "GPU Cache Usage (%)": {
+          "prometheus_metric": "vllm:gpu_cache_usage_perc", 
+          "query_type": "gauge",
+          "critical_threshold": 95.0,
+          "warning_threshold": 85.0,
+          "optimal_max": 90.0,
+          "unit": "percentage",
+          "description": "GPU memory cache utilization for model inference"
+        }
+      }
+    }
+  },
+  "analysis_config": {
+    "max_metrics_to_analyze": 12,
+    "volatility_thresholds": {
+      "high": 20.0,
+      "moderate": 10.0
+    },
+    "trend_significance": {
+      "min_r_squared": 0.3,
+      "min_slope": 0.01
+    },
+    "prediction_timeframes": {
+      "critical_minutes": 60,
+      "warning_hours": 6
+    }
+  }
+}

@@ -293,8 +293,8 @@ start_local_services() {
     if curl -s --connect-timeout 5 "http://localhost:$MCP_PORT/health" | grep -q '"status"'; then
         echo -e "${GREEN}✅ MCP Server started successfully on port $MCP_PORT${NC}"
     else
-        echo -e "${RED}❌ MCP Server failed to start${NC}"
-        exit 1
+        echo -e "${YELLOW}⚠️  MCP Server failed to start (continuing with other services)${NC}"
+        echo -e "${YELLOW}   Note: vLLM analysis may not work without MCP server${NC}"
     fi
     
     # Start Streamlit UI
