@@ -144,6 +144,6 @@ make uninstall NAMESPACE=your-namespace
 
 ## Tags
 
-* **Industry:** Cross-industry
+* **Business challenge:** Adopt and scale AI
 * **Product:** OpenShift AI
 * **Use case:** AI Operations, Observability, Monitoring
