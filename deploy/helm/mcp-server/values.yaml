@@ -9,7 +9,7 @@ deployment:
 
 image:
   repository: quay.io/ecosystem-appeng/aiobs-mcp-server
-  tag: 3.2.0
+  tag: v3.2.0
   pullPolicy: IfNotPresent
 
 service:
@@ -55,7 +55,7 @@ env:
   # - High error rate (~10%+): Can use 1-2 for faster analysis
   TRACE_FETCH_SAFETY_FACTOR: 2
 
-  KORREL8R_TIMEOUT_SECONDS: 8
+  KORREL8R_TIMEOUT_SECONDS: 15
   LLM_TIMEOUT_SECONDS: 180
   # GPU Metrics Discovery - custom prefix overrides (comma-separated, additive to defaults)
   GPU_METRICS_PREFIX_NVIDIA: ""
